@@ -16,8 +16,18 @@ def get_j4j_dockerspawner_token():
         token = f.read().rstrip()
     return token
 
+def get_quota_servicelevel_config(servicelevel):
+    with open('/etc/j4j/j4j_mount/j4j_docker/master/quota_{}.json'.format(servicelevel), 'r') as f:
+        ret = json.load(f)
+    return ret
+
 def get_quota_config():
     with open('/etc/j4j/j4j_mount/j4j_docker/master/quota.json', 'r') as f:
+        ret = json.load(f)
+    return ret
+
+def get_general_servicelevel_config(servicelevel):
+    with open('/etc/j4j/j4j_mount/j4j_docker/master/config_{}.json'.format(servicelevel), 'r') as f:
         ret = json.load(f)
     return ret
 

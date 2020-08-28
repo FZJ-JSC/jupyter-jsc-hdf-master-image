@@ -123,8 +123,12 @@ class JupyterLabHandler(Resource):
             dashboard = request_json.get('dashboard')
             image = request_json.get('image')
             port = request_json.get('port')
-            config = utils_file_loads.get_general_config()
-            quota_config = utils_file_loads.get_quota_config()
+            if 'SERVICELEVEL' in environments.keys():
+                config = utils_file_loads.get_general_servicelevel_config(environments.get("SERVICELEVEL", "default"))
+                quota_config = utils_file_loads.get_quota_servicelevel_config(environments.get("SERVICELEVEL", "default"))
+            else:
+                config = utils_file_loads.get_general_config()
+                quota_config = utils_file_loads.get_quota_config()
             jupyterhub_api_url = config.get('jupyterhub_api_url')
             basefolder = config.get('basefolder', '<no basefolder defined>')
             userfolder = os.path.join(basefolder, email)
