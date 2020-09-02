@@ -87,6 +87,9 @@ class JupyterLabHandler(Resource):
             Headers:
                 intern-authorization
                 uuidcode
+                accesstoken
+                expire
+                servicelevel
             Body:
                 servername
                 service
@@ -114,7 +117,9 @@ class JupyterLabHandler(Resource):
                     key = key.replace('-', '_')
                 request_json[key.lower()] = value
             app.log.trace("uuidcode={} - New Json: {}".format(uuidcode, request_json))
-            
+            accesstoken = request.headers.get('accesstoken')
+            expire = request.headers.get('expire')
+            servicelevel = request.headers.get('servicelevel', 'default')
             servername = request_json.get('servername')
             email = request_json.get('email')
             email = email.replace("@", "_at_")
@@ -123,25 +128,29 @@ class JupyterLabHandler(Resource):
             dashboard = request_json.get('dashboard')
             image = request_json.get('image')
             port = request_json.get('port')
-            if 'SERVICELEVEL' in environments.keys():
-                config = utils_file_loads.get_general_servicelevel_config(environments.get("SERVICELEVEL", "default"))
-                quota_config = utils_file_loads.get_quota_servicelevel_config(environments.get("SERVICELEVEL", "default"))
-            else:
+            try:
+                config = utils_file_loads.get_general_servicelevel_config(servicelevel)
+                quota_config = utils_file_loads.get_quota_servicelevel_config(servicelevel)
+            except:
+                app.log.exception("uuidcode={} - Could not find config/quota file for {}. Use default config files.".format(uuidcode, servicelevel))
                 config = utils_file_loads.get_general_config()
                 quota_config = utils_file_loads.get_quota_config()
             jupyterhub_api_url = config.get('jupyterhub_api_url')
             basefolder = config.get('basefolder', '<no basefolder defined>')
+            basehome = config.get('basehome', 'base_home')
             userfolder = os.path.join(basefolder, email)
             serverfolder = Path(os.path.join(userfolder, '.{}'.format(uuidcode)))
             os.umask(0)
-            user_id, set_user_quota = jlab_utils.create_user(app.log, uuidcode, app.database, quota_config, email, basefolder, userfolder)
-            jlab_utils.create_server_dirs(app.log, uuidcode, app.urls, app.database, service, dashboard, user_id, email, servername, serverfolder, basefolder)
+            user_id, set_user_quota = jlab_utils.create_user(app.log, uuidcode, app.database, quota_config, email, basefolder, userfolder, basehome)
+            jlab_utils.create_server_dirs(app.log, uuidcode, app.urls, app.database, servicelevel, service, dashboard, user_id, email, servername, serverfolder, basefolder)
             #jlab_utils.setup_server_quota(app.log, uuidcode, quota_config, serverfolder)
             try:
                 start = jlab_utils.call_slave_start(app.log,
                                                     uuidcode,
                                                     app.database,
                                                     app.urls,
+                                                    accesstoken,
+                                                    expire,
                                                     userfolder,
                                                     config,
                                                     quota_config,

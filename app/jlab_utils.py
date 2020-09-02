@@ -15,7 +15,7 @@ from pathlib import Path
 from time import sleep
 from app import utils_db, utils_file_loads, jlab_utils
 
-def call_slave_start(app_logger, uuidcode, app_database, app_urls, userfolder, config, quota_config, set_user_quota, user_id, servername, email, environments, image, port, jupyterhub_api_url):
+def call_slave_start(app_logger, uuidcode, app_database, app_urls, accesstoken, expire, userfolder, config, quota_config, set_user_quota, user_id, servername, email, environments, image, port, jupyterhub_api_url):
     user_running = utils_db.get_user_running(app_logger, uuidcode, app_database, user_id)
     if user_running >= config.get('user_running_limit', 10):
         app_logger.error("uuidcode={} - User has already {} JupyterLabs running (Limit: {}). Cancel start.".format(uuidcode, user_running, config.get('user_running_limit', 5)))
@@ -38,7 +38,9 @@ def call_slave_start(app_logger, uuidcode, app_database, app_urls, userfolder, c
         raise Exception("No Slaves available")
     header = {
              "Intern-Authorization": utils_file_loads.get_j4j_dockerspawner_token(),
-             "uuidcode": uuidcode
+             "uuidcode": uuidcode,
+             "accesstoken": accesstoken,
+             "expire": expire
              }
     body = {
            "email": email,
@@ -79,12 +81,16 @@ def call_slave_start(app_logger, uuidcode, app_database, app_urls, userfolder, c
     return True
     
 
-def create_server_dirs(app_logger, uuidcode, app_urls, app_database, service, dashboard, user_id, email, servername, serverfolder, basefolder):
+def create_server_dirs(app_logger, uuidcode, app_urls, app_database, servicelevel, service, dashboard, user_id, email, servername, serverfolder, basefolder):
     results = utils_db.get_container_info(app_logger, uuidcode, app_database, user_id, servername)
     app_logger.debug("uuidcode={} - Container Info: {}".format(uuidcode, results))
     if len(results) > 0:
         app_logger.debug("uuidcode={} - Server with name {} already exists. Delete it.".format(uuidcode, serverfolder))
-        config = utils_file_loads.get_general_config()
+        try:
+            config = utils_file_loads.get_general_servicelevel_config(servicelevel)
+        except:
+            app_logger.exception("uuidcode={} - Could not find config file for {}. Use default config".format(uuidcode, servicelevel))
+            config = utils_file_loads.get_general_config()
         user_id, slave_id, slave_hostname, containername, running_no = jlab_utils.get_slave_infos(app_logger,
                                                                                                   uuidcode,
                                                                                                   app_database,
@@ -106,6 +112,7 @@ def create_server_dirs(app_logger, uuidcode, app_urls, app_database, service, da
         except:
             app_logger.exception("uuidcode={} - Could not call DockerSpawner {}".format(uuidcode, slave_hostname))
         basefolder = config.get('basefolder', '<no basefolder defined>')
+        basehome = config.get("basehome", "base_home")
         userfolder = os.path.join(basefolder, email)
         serverfolder = Path(os.path.join(userfolder, '.{}'.format(containername)))
         utils_db.decrease_slave_running(app_logger, uuidcode, app_database, slave_id)
@@ -147,48 +154,48 @@ def create_server_dirs(app_logger, uuidcode, app_urls, app_database, service, da
     
     # Copy files to user home
     if service == "Dashboard":
-        app_logger.debug("{} - Try to copy base_home/.config_{}.py and base_home/.start_{}.sh".format(uuidcode, dashboard.replace(" ", "_"), dashboard.replace(" ", "_")))
-        base_start_sh = Path(os.path.join(basefolder, "base_home", ".start_{}.sh".format(dashboard.replace(" ", "_"))))
-        base_config_py = Path(os.path.join(basefolder, "base_home", ".config_{}.py".format(dashboard.replace(" ", "_"))))
+        app_logger.debug("{} - Try to copy {}/.config_{}.py and {}/.start_{}.sh".format(uuidcode, basehome, dashboard.replace(" ", "_"), basehome, dashboard.replace(" ", "_")))
+        base_start_sh = Path(os.path.join(basefolder, basehome, ".start_{}.sh".format(dashboard.replace(" ", "_"))))
+        base_config_py = Path(os.path.join(basefolder, basehome, ".config_{}.py".format(dashboard.replace(" ", "_"))))
     else:
-        base_config_py = Path(os.path.join(basefolder, "base_home", ".config.py"))
-        base_start_sh = Path(os.path.join(basefolder, "base_home", ".start.sh"))
+        base_config_py = Path(os.path.join(basefolder, basehome, ".config.py"))
+        base_start_sh = Path(os.path.join(basefolder, basehome, ".start.sh"))
     user_start_sh = Path(os.path.join(serverfolder, ".start.sh"))
     shutil.copy2(base_start_sh, user_start_sh)
     os.chown(user_start_sh, 1000, 100)
     user_config_py = Path(os.path.join(serverfolder, ".config.py"))
     shutil.copy2(base_config_py, user_config_py)
     os.chown(user_config_py, 1000, 100)
-    base_jovyan = Path(os.path.join(basefolder, "base_home", ".who_is_jovyan.txt"))
+    base_jovyan = Path(os.path.join(basefolder, basehome, ".who_is_jovyan.txt"))
     user_jovyan = Path(os.path.join(serverfolder, ".who_is_jovyan.txt"))
     shutil.copy2(base_jovyan, user_jovyan)
     os.chown(user_jovyan, 1000, 100)
-    base_mounthpc_sh = Path(os.path.join(basefolder, "base_home", "mount_hpc.sh"))
+    base_mounthpc_sh = Path(os.path.join(basefolder, basehome, "mount_hpc.sh"))
     user_mounthpc_sh = Path(os.path.join(serverfolder, "mount_hpc.sh"))
     shutil.copy2(base_mounthpc_sh, user_mounthpc_sh)
     os.chown(user_mounthpc_sh, 1000, 100)
-    base_manageprojects_sh = Path(os.path.join(basefolder, "base_home", "manage_projects.sh"))
+    base_manageprojects_sh = Path(os.path.join(basefolder, basehome, "manage_projects.sh"))
     user_manageprojects_sh = Path(os.path.join(serverfolder, "manage_projects.sh"))
     shutil.copy2(base_manageprojects_sh, user_manageprojects_sh)
     os.chown(user_manageprojects_sh, 1000, 100)
-    base_faq_ipynb = Path(os.path.join(basefolder, "base_home", "FAQ.ipynb"))
+    base_faq_ipynb = Path(os.path.join(basefolder, basehome, "FAQ.ipynb"))
     user_faq_ipynb = Path(os.path.join(serverfolder, "FAQ.ipynb"))
     shutil.copy2(base_faq_ipynb, user_faq_ipynb)
     os.chown(user_faq_ipynb, 1000, 100)
     
 
-def create_user(app_logger, uuidcode, app_database, quota_config, email, basefolder, userfolder):
+def create_user(app_logger, uuidcode, app_database, quota_config, email, basefolder, userfolder, basehome="base_home"):
     user_id = utils_db.get_user_id(app_logger, uuidcode, app_database, email)
     if user_id != 0:
         return user_id, False
     utils_db.create_user(app_logger, uuidcode, app_database, email)
     user_id = utils_db.get_user_id(app_logger, uuidcode, app_database, email)
-    create_base_dirs(app_logger, uuidcode, basefolder, userfolder)
+    create_base_dirs(app_logger, uuidcode, basefolder, userfolder, basehome)
     #setup_base_quota(app_logger, uuidcode, quota_config, basefolder, userfolder, email)
     return user_id, True
 
 
-def create_base_dirs(app_logger, uuidcode, basefolder, userfolder):
+def create_base_dirs(app_logger, uuidcode, basefolder, userfolder, basehome="base_home"):
     work = Path(os.path.join(userfolder, "work"))
     projects = Path(os.path.join(userfolder, "Projects"))
     myproject = Path(os.path.join(projects, "MyProjects"))
@@ -197,11 +204,11 @@ def create_base_dirs(app_logger, uuidcode, basefolder, userfolder):
     share = Path(os.path.join(projects, ".share"))
     share_result = Path(os.path.join(projects, ".share_result"))
     hpc_mount = Path(os.path.join(work, ".hpc_mount"))
-    base_mount_judac_sh = Path(os.path.join(basefolder, "base_home", "mount_judac.sh"))
+    base_mount_judac_sh = Path(os.path.join(basefolder, basehome, "mount_judac.sh"))
     user_mount_judac_sh = Path(os.path.join(hpc_mount, "mount_judac.sh"))
     upload = Path(os.path.join(hpc_mount, ".upload"))
     davfs2 = Path(os.path.join(work, ".davfs2"))
-    base_secrets = Path(os.path.join(basefolder, "base_home", "secrets"))
+    base_secrets = Path(os.path.join(basefolder, basehome, "secrets"))
     user_secrets = Path(os.path.join(davfs2, "secrets"))
     work.mkdir(parents=True)
     projects.mkdir()
