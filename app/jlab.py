@@ -149,6 +149,7 @@ class JupyterLabHandler(Resource):
                                                     uuidcode,
                                                     app.database,
                                                     app.urls,
+                                                    servicelevel,
                                                     accesstoken,
                                                     expire,
                                                     userfolder,

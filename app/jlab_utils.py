@@ -15,7 +15,7 @@ from pathlib import Path
 from time import sleep
 from app import utils_db, utils_file_loads, jlab_utils
 
-def call_slave_start(app_logger, uuidcode, app_database, app_urls, accesstoken, expire, userfolder, config, quota_config, set_user_quota, user_id, servername, email, environments, image, port, jupyterhub_api_url):
+def call_slave_start(app_logger, uuidcode, app_database, app_urls, servicelevel, accesstoken, expire, userfolder, config, quota_config, set_user_quota, user_id, servername, email, environments, image, port, jupyterhub_api_url):
     user_running = utils_db.get_user_running(app_logger, uuidcode, app_database, user_id)
     if user_running >= config.get('user_running_limit', 10):
         app_logger.error("uuidcode={} - User has already {} JupyterLabs running (Limit: {}). Cancel start.".format(uuidcode, user_running, config.get('user_running_limit', 5)))
@@ -39,6 +39,7 @@ def call_slave_start(app_logger, uuidcode, app_database, app_urls, accesstoken, 
     header = {
              "Intern-Authorization": utils_file_loads.get_j4j_dockerspawner_token(),
              "uuidcode": uuidcode,
+             "servicelevel": servicelevel,
              "accesstoken": accesstoken,
              "expire": expire
              }
