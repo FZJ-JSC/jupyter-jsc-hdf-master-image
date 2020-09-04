@@ -84,13 +84,15 @@ def call_slave_start(app_logger, uuidcode, app_database, app_urls, accesstoken, 
 def create_server_dirs(app_logger, uuidcode, app_urls, app_database, servicelevel, service, dashboard, user_id, email, servername, serverfolder, basefolder):
     results = utils_db.get_container_info(app_logger, uuidcode, app_database, user_id, servername)
     app_logger.debug("uuidcode={} - Container Info: {}".format(uuidcode, results))
+    try:
+        config = utils_file_loads.get_general_servicelevel_config(servicelevel)
+    except:
+        app_logger.exception("uuidcode={} - Could not find config file for {}. Use default config".format(uuidcode, servicelevel))
+        config = utils_file_loads.get_general_config()
+    basefolder = config.get('basefolder', '<no basefolder defined>')
+    basehome = config.get("basehome", "base_home")
     if len(results) > 0:
         app_logger.debug("uuidcode={} - Server with name {} already exists. Delete it.".format(uuidcode, serverfolder))
-        try:
-            config = utils_file_loads.get_general_servicelevel_config(servicelevel)
-        except:
-            app_logger.exception("uuidcode={} - Could not find config file for {}. Use default config".format(uuidcode, servicelevel))
-            config = utils_file_loads.get_general_config()
         user_id, slave_id, slave_hostname, containername, running_no = jlab_utils.get_slave_infos(app_logger,
                                                                                                   uuidcode,
                                                                                                   app_database,
@@ -111,8 +113,7 @@ def create_server_dirs(app_logger, uuidcode, app_urls, app_database, serviceleve
                     app_logger.error("uuidcode={} - DockerSpawner delete failed: {} {}".format(uuidcode, r.text, r.status_code))
         except:
             app_logger.exception("uuidcode={} - Could not call DockerSpawner {}".format(uuidcode, slave_hostname))
-        basefolder = config.get('basefolder', '<no basefolder defined>')
-        basehome = config.get("basehome", "base_home")
+        
         userfolder = os.path.join(basefolder, email)
         serverfolder = Path(os.path.join(userfolder, '.{}'.format(containername)))
         utils_db.decrease_slave_running(app_logger, uuidcode, app_database, slave_id)
