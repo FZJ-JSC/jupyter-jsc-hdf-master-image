@@ -4,6 +4,7 @@ Created on Feb 12, 2020
 @author: Tim Kreuzer
 '''
 
+import json
 import os
 import shutil
 
@@ -82,7 +83,7 @@ def call_slave_start(app_logger, uuidcode, app_database, app_urls, servicelevel,
     return True
     
 
-def create_server_dirs(app_logger, uuidcode, app_urls, app_database, servicelevel, service, dashboard, user_id, email, servername, serverfolder, basefolder):
+def create_server_dirs(app_logger, uuidcode, app_urls, app_database, servicelevel, service, dashboard, image, user_id, email, servername, serverfolder, basefolder):
     results = utils_db.get_container_info(app_logger, uuidcode, app_database, user_id, servername)
     app_logger.debug("uuidcode={} - Container Info: {}".format(uuidcode, results))
     try:
@@ -154,11 +155,19 @@ def create_server_dirs(app_logger, uuidcode, app_urls, app_database, serviceleve
         sharedprojects.mkdir()
         os.chown(sharedprojects, 1000, 100)
     
+    try:
+        with open(os.environ.get("EASYBUILDIMAGESPATH"), "r") as f:
+            easybuildimages = json.load(f)
+    except:
+        easybuildimages = []
     # Copy files to user home
     if service == "Dashboard":
         app_logger.debug("{} - Try to copy {}/.config_{}.py and {}/.start_{}.sh".format(uuidcode, basehome, dashboard.replace(" ", "_"), basehome, dashboard.replace(" ", "_")))
         base_start_sh = Path(os.path.join(basefolder, basehome, ".start_{}.sh".format(dashboard.replace(" ", "_"))))
         base_config_py = Path(os.path.join(basefolder, basehome, ".config_{}.py".format(dashboard.replace(" ", "_"))))
+    elif image in easybuildimages:
+        base_config_py = Path(os.path.join(basefolder, basehome, ".config_easybuild.py"))
+        base_start_sh = Path(os.path.join(basefolder, basehome, ".start_easybuild.sh"))
     else:
         base_config_py = Path(os.path.join(basefolder, basehome, ".config.py"))
         base_start_sh = Path(os.path.join(basefolder, basehome, ".start.sh"))

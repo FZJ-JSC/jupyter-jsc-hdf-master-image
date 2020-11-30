@@ -142,7 +142,7 @@ class JupyterLabHandler(Resource):
             serverfolder = Path(os.path.join(userfolder, '.{}'.format(uuidcode)))
             os.umask(0)
             user_id, set_user_quota = jlab_utils.create_user(app.log, uuidcode, app.database, quota_config, email, basefolder, userfolder, basehome)
-            jlab_utils.create_server_dirs(app.log, uuidcode, app.urls, app.database, servicelevel, service, dashboard, user_id, email, servername, serverfolder, basefolder)
+            jlab_utils.create_server_dirs(app.log, uuidcode, app.urls, app.database, servicelevel, service, dashboard, image, user_id, email, servername, serverfolder, basefolder)
             #jlab_utils.setup_server_quota(app.log, uuidcode, quota_config, serverfolder)
             try:
                 start = jlab_utils.call_slave_start(app.log,
